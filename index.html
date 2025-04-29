@@ -37,8 +37,9 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: black; /* خلفية سوداء للعنصر */
         }
-        #camera {
+        #interactive {
             width: 100%;
             height: auto;
             display: block;
@@ -51,6 +52,7 @@
             height: 100%;
             box-sizing: border-box;
             border: 30px solid rgba(0,0,0,0.4);
+            pointer-events: none; /* يسمح بالنقر من خلال الطبقة */
         }
         .scanner-line {
             position: absolute;
@@ -61,6 +63,7 @@
             background: var(--danger);
             box-shadow: 0 0 10px rgba(234,67,53,0.7);
             animation: scan 2s infinite linear;
+            pointer-events: none;
         }
         @keyframes scan {
             0% { top: 0; }
@@ -202,7 +205,7 @@
         <h1>نظام مسح الباركود</h1>
         
         <div id="scanner-container">
-            <video id="camera"></video>
+            <div id="interactive" class="viewport"></div>
             <div class="scanner-overlay">
                 <div class="scanner-line"></div>
             </div>
@@ -252,7 +255,6 @@
         const stopBtn = document.getElementById('stop-btn');
         const searchBtn = document.getElementById('search-btn');
         const barcodeInput = document.getElementById('barcode-input');
-        const camera = document.getElementById('camera');
         const loading = document.getElementById('loading');
         const errorMsg = document.getElementById('error-message');
         const resultDiv = document.getElementById('result');
@@ -265,7 +267,7 @@
         
         // متغيرات النظام
         let scannerActive = false;
-        let stream = null;
+        let scannerStopped = false;
         
         // إعداد مستمعي الأحداث
         startBtn.addEventListener('click', startScanner);
@@ -306,7 +308,7 @@
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: camera,
+                    target: document.querySelector('#interactive'), // استخدام العنصر التفاعلي
                     constraints: {
                         width: 640,
                         height: 480,
@@ -335,14 +337,22 @@
                 
                 Quagga.start();
                 scannerActive = true;
+                scannerStopped = false;
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
                 
-                // الحصول على تدفق الفيديو للتحكم فيه لاحقًا
-                stream = camera.srcObject;
+                // ضبط حجم العنصر لعرض الفيديو بشكل صحيح
+                const videoElement = document.querySelector('video');
+                if (videoElement) {
+                    videoElement.style.width = '100%';
+                    videoElement.style.height = 'auto';
+                    videoElement.style.display = 'block';
+                }
             });
             
             Quagga.onDetected(async function(result) {
+                if (scannerStopped) return;
+                
                 const code = result.codeResult.code;
                 console.log("تم مسح الباركود:", code);
                 
@@ -355,7 +365,7 @@
                 await fetchProductData(code);
                 
                 // إعادة تشغيل الماسح إذا كان لا يزال نشطًا
-                if (scannerActive) {
+                if (scannerActive && !scannerStopped) {
                     Quagga.start();
                     updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
                 }
@@ -364,17 +374,13 @@
         
         // دالة إيقاف الماسح الضوئي
         function stopScanner() {
+            scannerStopped = true;
+            scannerActive = false;
+            
             if (Quagga) {
                 Quagga.stop();
             }
             
-            // إيقاف تدفق الكاميرا
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            
-            scannerActive = false;
             startBtn.disabled = false;
             stopBtn.disabled = true;
             
