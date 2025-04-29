@@ -153,6 +153,37 @@
             background: rgba(234,67,53,0.1);
             display: none;
         }
+        .camera-status {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .camera-active {
+            background: rgba(66, 133, 244, 0.1);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        .camera-inactive {
+            background: rgba(234, 67, 53, 0.1);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+        .pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary);
+            margin-left: 5px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
         @media (max-width: 480px) {
             button {
                 padding: 10px 15px;
@@ -175,6 +206,11 @@
             <div class="scanner-overlay">
                 <div class="scanner-line"></div>
             </div>
+        </div>
+        
+        <div id="camera-status" class="camera-status">
+            <span id="status-text"></span>
+            <span id="status-indicator" class="pulse"></span>
         </div>
         
         <div class="controls">
@@ -220,6 +256,9 @@
         const loading = document.getElementById('loading');
         const errorMsg = document.getElementById('error-message');
         const resultDiv = document.getElementById('result');
+        const cameraStatus = document.getElementById('camera-status');
+        const statusText = document.getElementById('status-text');
+        const statusIndicator = document.getElementById('status-indicator');
         
         // رابط API الخاص بجوجل شيت
         const API_URL = "https://script.google.com/macros/s/AKfycbyOk73QSLWwDMl_eDYeWQXvu4p2dJy_Hzin9KbAh1vVpkY7wJWu4RI6lytQguwfPRnA/exec";
@@ -238,11 +277,30 @@
             }
         });
         
+        // دالة تحديث حالة الكاميرا
+        function updateCameraStatus(active, message) {
+            cameraStatus.style.display = 'block';
+            statusText.textContent = message;
+            
+            if (active) {
+                cameraStatus.classList.remove('camera-inactive');
+                cameraStatus.classList.add('camera-active');
+                statusIndicator.style.display = 'inline-block';
+            } else {
+                cameraStatus.classList.remove('camera-active');
+                cameraStatus.classList.add('camera-inactive');
+                statusIndicator.style.display = 'none';
+            }
+        }
+        
         // دالة بدء الماسح الضوئي
         function startScanner() {
             // إخفاء الرسائل والنتائج السابقة
             hideError();
             resultDiv.style.display = 'none';
+            
+            // تحديث حالة الكاميرا
+            updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
             
             Quagga.init({
                 inputStream: {
@@ -271,6 +329,7 @@
             }, function(err) {
                 if (err) {
                     showError("تعذر تشغيل الكاميرا: " + err.message);
+                    updateCameraStatus(false, "الكاميرا غير نشطة");
                     return;
                 }
                 
@@ -287,6 +346,9 @@
                 const code = result.codeResult.code;
                 console.log("تم مسح الباركود:", code);
                 
+                // تحديث حالة الكاميرا أثناء معالجة الباركود
+                updateCameraStatus(false, "جاري معالجة الباركود...");
+                
                 // إيقاف الماسح مؤقتًا أثناء جلب البيانات
                 Quagga.stop();
                 
@@ -295,6 +357,7 @@
                 // إعادة تشغيل الماسح إذا كان لا يزال نشطًا
                 if (scannerActive) {
                     Quagga.start();
+                    updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
                 }
             });
         }
@@ -314,6 +377,9 @@
             scannerActive = false;
             startBtn.disabled = false;
             stopBtn.disabled = true;
+            
+            // تحديث حالة الكاميرا
+            updateCameraStatus(false, "الكاميرا متوقفة");
         }
         
         // دالة البحث عن الباركود يدويًا
