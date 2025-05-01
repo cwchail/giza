@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>نظام مسح الباركود - جوجل شيت</title>
     <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         :root {
             --primary: #4285F4;
@@ -37,7 +38,7 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background-color: black; /* خلفية سوداء للعنصر */
+            background-color: black;
         }
         #interactive {
             width: 100%;
@@ -52,7 +53,7 @@
             height: 100%;
             box-sizing: border-box;
             border: 30px solid rgba(0,0,0,0.4);
-            pointer-events: none; /* يسمح بالنقر من خلال الطبقة */
+            pointer-events: none;
         }
         .scanner-line {
             position: absolute;
@@ -97,6 +98,9 @@
         }
         #search-btn {
             background: var(--secondary);
+        }
+        #mode-toggle {
+            background: #FF9800;
         }
         #manual-input {
             display: flex;
@@ -219,10 +223,11 @@
         <div class="controls">
             <button id="start-btn">بدء المسح</button>
             <button id="stop-btn" disabled>إيقاف المسح</button>
+            <button id="mode-toggle" title="تبديل بين وضع الباركود والكواركود">وضع الباركود</button>
         </div>
         
         <div id="manual-input">
-            <input type="text" id="barcode-input" placeholder="أدخل رقم الباركود" inputmode="numeric">
+            <input type="text" id="barcode-input" placeholder="أدخل رقم الباركود/الكواركود">
             <button id="search-btn">بحث</button>
         </div>
         
@@ -254,6 +259,7 @@
         const startBtn = document.getElementById('start-btn');
         const stopBtn = document.getElementById('stop-btn');
         const searchBtn = document.getElementById('search-btn');
+        const modeToggleBtn = document.getElementById('mode-toggle');
         const barcodeInput = document.getElementById('barcode-input');
         const loading = document.getElementById('loading');
         const errorMsg = document.getElementById('error-message');
@@ -268,16 +274,38 @@
         // متغيرات النظام
         let scannerActive = false;
         let scannerStopped = false;
+        let currentMode = 'barcode'; // 'barcode' أو 'qrcode'
+        let codeReader = null;
         
         // إعداد مستمعي الأحداث
         startBtn.addEventListener('click', startScanner);
         stopBtn.addEventListener('click', stopScanner);
         searchBtn.addEventListener('click', searchBarcode);
+        modeToggleBtn.addEventListener('click', toggleMode);
         barcodeInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 searchBarcode();
             }
         });
+        
+        // دالة تبديل وضع المسح بين الباركود والكواركود
+        function toggleMode() {
+            if (currentMode === 'barcode') {
+                currentMode = 'qrcode';
+                modeToggleBtn.textContent = 'وضع الكواركود';
+                modeToggleBtn.style.backgroundColor = '#9C27B0';
+            } else {
+                currentMode = 'barcode';
+                modeToggleBtn.textContent = 'وضع الباركود';
+                modeToggleBtn.style.backgroundColor = '#FF9800';
+            }
+            
+            // إذا كان الماسح يعمل، أعد تشغيله بالوضع الجديد
+            if (scannerActive) {
+                stopScanner();
+                startScanner();
+            }
+        }
         
         // دالة تحديث حالة الكاميرا
         function updateCameraStatus(active, message) {
@@ -302,13 +330,22 @@
             resultDiv.style.display = 'none';
             
             // تحديث حالة الكاميرا
-            updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
+            updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن " + (currentMode === 'barcode' ? "الباركود" : "الكواركود"));
             
+            if (currentMode === 'barcode') {
+                startBarcodeScanner();
+            } else {
+                startQRCodeScanner();
+            }
+        }
+        
+        // دالة بدء ماسح الباركود
+        function startBarcodeScanner() {
             Quagga.init({
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: document.querySelector('#interactive'), // استخدام العنصر التفاعلي
+                    target: document.querySelector('#interactive'),
                     constraints: {
                         width: 640,
                         height: 480,
@@ -322,7 +359,10 @@
                         "ean_reader",
                         "ean_8_reader",
                         "code_39_reader",
-                        "upc_reader"
+                        "upc_reader",
+                        "upc_e_reader",
+                        "codabar_reader",
+                        "i2of5_reader"
                     ],
                     multiple: false
                 },
@@ -372,13 +412,58 @@
             });
         }
         
+        // دالة بدء ماسح الكواركود
+        function startQRCodeScanner() {
+            // تهيئة قارئ الكواركود
+            codeReader = new ZXing.BrowserMultiFormatReader();
+            
+            codeReader.decodeFromVideoDevice(undefined, 'interactive', (result, err) => {
+                if (err) {
+                    if (err instanceof ZXing.NotFoundException) {
+                        return; // لم يتم العثور على كود بعد
+                    }
+                    showError("خطأ في قراءة الكواركود: " + err.message);
+                    return;
+                }
+                
+                if (scannerStopped) return;
+                
+                const code = result.text;
+                console.log("تم مسح الكواركود:", code);
+                
+                // تحديث حالة الكاميرا أثناء معالجة الكواركود
+                updateCameraStatus(false, "جاري معالجة الكواركود...");
+                
+                // إيقاف الماسح مؤقتًا أثناء جلب البيانات
+                codeReader.reset();
+                
+                fetchProductData(code).then(() => {
+                    // إعادة تشغيل الماسح إذا كان لا يزال نشطًا
+                    if (scannerActive && !scannerStopped) {
+                        codeReader.decodeFromVideoDevice(undefined, 'interactive', arguments.callee);
+                        updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الكواركود");
+                    }
+                });
+            }).then(() => {
+                scannerActive = true;
+                scannerStopped = false;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            }).catch(err => {
+                showError("تعذر تشغيل الكاميرا: " + err.message);
+                updateCameraStatus(false, "الكاميرا غير نشطة");
+            });
+        }
+        
         // دالة إيقاف الماسح الضوئي
         function stopScanner() {
             scannerStopped = true;
             scannerActive = false;
             
-            if (Quagga) {
+            if (currentMode === 'barcode' && Quagga) {
                 Quagga.stop();
+            } else if (currentMode === 'qrcode' && codeReader) {
+                codeReader.reset();
             }
             
             startBtn.disabled = false;
@@ -390,10 +475,10 @@
         
         // دالة البحث عن الباركود يدويًا
         function searchBarcode() {
-            const barcode = barcodeInput.value.trim();
+            const code = barcodeInput.value.trim();
             
-            if (!barcode) {
-                showError("الرجاء إدخال رقم الباركود");
+            if (!code) {
+                showError("الرجاء إدخال رقم الباركود/الكواركود");
                 return;
             }
             
@@ -401,20 +486,20 @@
             hideError();
             resultDiv.style.display = 'none';
             
-            fetchProductData(barcode);
+            fetchProductData(code);
             
             // مسح حقل الإدخال
             barcodeInput.value = '';
         }
         
         // دالة جلب بيانات المنتج من جوجل شيت
-        async function fetchProductData(barcode) {
+        async function fetchProductData(code) {
             try {
                 // عرض مؤشر التحميل
                 loading.style.display = 'block';
                 
                 // جلب البيانات من API
-                const response = await fetch(`${API_URL}?barcode=${encodeURIComponent(barcode)}`);
+                const response = await fetch(`${API_URL}?barcode=${encodeURIComponent(code)}`);
                 
                 if (!response.ok) {
                     throw new Error("خطأ في الاتصال بالسيرفر");
