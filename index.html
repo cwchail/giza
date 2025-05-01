@@ -37,7 +37,7 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background-color: black; /* خلفية سوداء للعنصر */
+            background-color: black;
         }
         #interactive {
             width: 100%;
@@ -52,7 +52,7 @@
             height: 100%;
             box-sizing: border-box;
             border: 30px solid rgba(0,0,0,0.4);
-            pointer-events: none; /* يسمح بالنقر من خلال الطبقة */
+            pointer-events: none;
         }
         .scanner-line {
             position: absolute;
@@ -261,6 +261,7 @@
         const cameraStatus = document.getElementById('camera-status');
         const statusText = document.getElementById('status-text');
         const statusIndicator = document.getElementById('status-indicator');
+        const scannerContainer = document.getElementById('scanner-container');
         
         // رابط API الخاص بجوجل شيت
         const API_URL = "https://script.google.com/macros/s/AKfycbyOk73QSLWwDMl_eDYeWQXvu4p2dJy_Hzin9KbAh1vVpkY7wJWu4RI6lytQguwfPRnA/exec";
@@ -288,10 +289,12 @@
                 cameraStatus.classList.remove('camera-inactive');
                 cameraStatus.classList.add('camera-active');
                 statusIndicator.style.display = 'inline-block';
+                scannerContainer.style.display = 'block';
             } else {
                 cameraStatus.classList.remove('camera-active');
                 cameraStatus.classList.add('camera-inactive');
                 statusIndicator.style.display = 'none';
+                scannerContainer.style.display = 'none';
             }
         }
         
@@ -308,7 +311,7 @@
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: document.querySelector('#interactive'), // استخدام العنصر التفاعلي
+                    target: document.querySelector('#interactive'),
                     constraints: {
                         width: 640,
                         height: 480,
@@ -359,16 +362,10 @@
                 // تحديث حالة الكاميرا أثناء معالجة الباركود
                 updateCameraStatus(false, "جاري معالجة الباركود...");
                 
-                // إيقاف الماسح مؤقتًا أثناء جلب البيانات
-                Quagga.stop();
+                // إيقاف الماسح نهائياً بعد قراءة الباركود
+                stopScanner();
                 
                 await fetchProductData(code);
-                
-                // إعادة تشغيل الماسح إذا كان لا يزال نشطًا
-                if (scannerActive && !scannerStopped) {
-                    Quagga.start();
-                    updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
-                }
             });
         }
         
