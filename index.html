@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>نظام مسح الباركود - جوجل شيت</title>
-    <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
+    <title>نظام مسح QR Code - جوجل شيت</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.min.js"></script>
     <style>
         :root {
             --primary: #4285F4;
@@ -43,6 +43,9 @@
             width: 100%;
             height: auto;
             display: block;
+        }
+        #canvas {
+            display: none;
         }
         .scanner-overlay {
             position: absolute;
@@ -202,10 +205,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>نظام مسح الباركود</h1>
+        <h1>نظام مسح QR Code</h1>
         
         <div id="scanner-container">
             <div id="interactive" class="viewport"></div>
+            <canvas id="canvas"></canvas>
             <div class="scanner-overlay">
                 <div class="scanner-line"></div>
             </div>
@@ -222,7 +226,7 @@
         </div>
         
         <div id="manual-input">
-            <input type="text" id="barcode-input" placeholder="أدخل رقم الباركود" inputmode="numeric">
+            <input type="text" id="barcode-input" placeholder="أدخل الرقم يدوياً" inputmode="numeric">
             <button id="search-btn">بحث</button>
         </div>
         
@@ -262,6 +266,8 @@
         const statusText = document.getElementById('status-text');
         const statusIndicator = document.getElementById('status-indicator');
         const scannerContainer = document.getElementById('scanner-container');
+        const canvas = document.getElementById('canvas');
+        const canvasCtx = canvas.getContext('2d');
         
         // رابط API الخاص بجوجل شيت
         const API_URL = "https://script.google.com/macros/s/AKfycbyOk73QSLWwDMl_eDYeWQXvu4p2dJy_Hzin9KbAh1vVpkY7wJWu4RI6lytQguwfPRnA/exec";
@@ -269,6 +275,8 @@
         // متغيرات النظام
         let scannerActive = false;
         let scannerStopped = false;
+        let videoStream = null;
+        let scanInterval = null;
         
         // إعداد مستمعي الأحداث
         startBtn.addEventListener('click', startScanner);
@@ -305,67 +313,63 @@
             resultDiv.style.display = 'none';
             
             // تحديث حالة الكاميرا
-            updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن الباركود");
+            updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن QR كود");
             
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#interactive'),
-                    constraints: {
-                        width: 640,
-                        height: 480,
-                        facingMode: "environment",
-                        focusMode: "continuous"
-                    },
-                },
-                decoder: {
-                    readers: [
-                        "code_128_reader",
-                        "ean_reader",
-                        "ean_8_reader",
-                        "code_39_reader",
-                        "upc_reader"
-                    ],
-                    multiple: false
-                },
-                locate: true,
-                numOfWorkers: 4
-            }, function(err) {
-                if (err) {
-                    showError("تعذر تشغيل الكاميرا: " + err.message);
-                    updateCameraStatus(false, "الكاميرا غير نشطة");
-                    return;
+            startQRScanner();
+        }
+        
+        // دالة بدء مسح QR Code
+        function startQRScanner() {
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
+            }).then(function(stream) {
+                videoStream = stream;
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.setAttribute('playsinline', 'true');
+                video.style.width = '100%';
+                video.style.height = 'auto';
+                video.style.display = 'block';
                 
-                Quagga.start();
+                // تنظيف العنصر التفاعلي أولاً
+                const interactive = document.getElementById('interactive');
+                interactive.innerHTML = '';
+                interactive.appendChild(video);
+                
+                video.play();
+                
                 scannerActive = true;
                 scannerStopped = false;
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
                 
-                // ضبط حجم العنصر لعرض الفيديو بشكل صحيح
-                const videoElement = document.querySelector('video');
-                if (videoElement) {
-                    videoElement.style.width = '100%';
-                    videoElement.style.height = 'auto';
-                    videoElement.style.display = 'block';
-                }
-            });
-            
-            Quagga.onDetected(async function(result) {
-                if (scannerStopped) return;
+                // بدء عملية المسح
+                scanInterval = setInterval(() => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        const imageData = canvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert",
+                        });
+                        
+                        if (code) {
+                            console.log("تم مسح QR Code:", code.data);
+                            stopScanner();
+                            fetchProductData(code.data);
+                        }
+                    }
+                }, 200);
                 
-                const code = result.codeResult.code;
-                console.log("تم مسح الباركود:", code);
-                
-                // تحديث حالة الكاميرا أثناء معالجة الباركود
-                updateCameraStatus(false, "جاري معالجة الباركود...");
-                
-                // إيقاف الماسح نهائياً بعد قراءة الباركود
-                stopScanner();
-                
-                await fetchProductData(code);
+            }).catch(function(err) {
+                showError("تعذر تشغيل الكاميرا: " + err.message);
+                updateCameraStatus(false, "الكاميرا غير نشطة");
             });
         }
         
@@ -374,8 +378,10 @@
             scannerStopped = true;
             scannerActive = false;
             
-            if (Quagga) {
-                Quagga.stop();
+            clearInterval(scanInterval);
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
             }
             
             startBtn.disabled = false;
@@ -390,7 +396,7 @@
             const barcode = barcodeInput.value.trim();
             
             if (!barcode) {
-                showError("الرجاء إدخال رقم الباركود");
+                showError("الرجاء إدخال الرقم");
                 return;
             }
             
