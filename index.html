@@ -239,39 +239,39 @@
         <div id="result">
             <h2 style="text-align: center; color: var(--primary); margin-top: 0;">تفاصيل العنصر</h2>
             <div class="product-field">
-                <span class="field-label">Functional Loc.:</span>
+                <span class="field-label">الموقع الوظيفي:</span>
                 <span class="field-value" id="functional-loc">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Covering Area:</span>
+                <span class="field-label">منطقة التغطية:</span>
                 <span class="field-value" id="covering-area">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Description:</span>
+                <span class="field-label">الوصف:</span>
                 <span class="field-value" id="description">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Category Description:</span>
+                <span class="field-label">وصف الفئة:</span>
                 <span class="field-value" id="category-desc">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Last Inspection Date:</span>
+                <span class="field-label">تاريخ آخر تفتيش:</span>
                 <span class="field-value" id="inspection-date">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Last Testing Date:</span>
+                <span class="field-label">تاريخ آخر اختبار:</span>
                 <span class="field-value" id="testing-date">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Operating Area:</span>
+                <span class="field-label">منطقة التشغيل:</span>
                 <span class="field-value" id="operating-area">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Business Line:</span>
+                <span class="field-label">خط الأعمال:</span>
                 <span class="field-value" id="business-line">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">City:</span>
+                <span class="field-label">المدينة:</span>
                 <span class="field-value" id="city">-</span>
             </div>
             <div class="product-field">
@@ -279,23 +279,23 @@
                 <span class="field-value" id="ss">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Serial Number:</span>
+                <span class="field-label">الرقم التسلسلي:</span>
                 <span class="field-value" id="serial-number">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Object Type:</span>
+                <span class="field-label">نوع الكائن:</span>
                 <span class="field-value" id="object-type">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Location:</span>
+                <span class="field-label">الموقع:</span>
                 <span class="field-value" id="location">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Owning Dept.:</span>
+                <span class="field-label">القسم المالك:</span>
                 <span class="field-value" id="owning-dept">-</span>
             </div>
             <div class="product-field">
-                <span class="field-label">Business+Operating Area:</span>
+                <span class="field-label">منطقة الأعمال+التشغيل:</span>
                 <span class="field-value" id="business-operating-area">-</span>
             </div>
         </div>
@@ -356,13 +356,9 @@
         
         // دالة بدء الماسح الضوئي
         function startScanner() {
-            // إخفاء الرسائل والنتائج السابقة
             hideError();
             resultDiv.style.display = 'none';
-            
-            // تحديث حالة الكاميرا
             updateCameraStatus(true, "الكاميرا تعمل - جاري البحث عن QR كود");
-            
             startQRScanner();
         }
         
@@ -383,37 +379,38 @@
                 video.style.height = 'auto';
                 video.style.display = 'block';
                 
-                // تنظيف العنصر التفاعلي أولاً
                 const interactive = document.getElementById('interactive');
                 interactive.innerHTML = '';
                 interactive.appendChild(video);
                 
-                video.play();
-                
-                scannerActive = true;
-                scannerStopped = false;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                
-                // بدء عملية المسح
-                scanInterval = setInterval(() => {
-                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        const imageData = canvasCtx.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: "dontInvert",
-                        });
-                        
-                        if (code) {
-                            console.log("تم مسح QR Code:", code.data);
-                            stopScanner();
-                            fetchProductData(code.data);
+                video.play().then(() => {
+                    scannerActive = true;
+                    scannerStopped = false;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    
+                    scanInterval = setInterval(() => {
+                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            const imageData = canvasCtx.getImageData(0, 0, canvas.width, canvas.height);
+                            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                                inversionAttempts: "dontInvert",
+                            });
+                            
+                            if (code) {
+                                console.log("تم مسح QR Code:", code.data);
+                                stopScanner();
+                                fetchProductData(code.data);
+                            }
                         }
-                    }
-                }, 200);
+                    }, 200);
+                }).catch(err => {
+                    showError("تعذر تشغيل الفيديو: " + err.message);
+                    updateCameraStatus(false, "خطأ في تشغيل الكاميرا");
+                });
                 
             }).catch(function(err) {
                 showError("تعذر تشغيل الكاميرا: " + err.message);
@@ -423,6 +420,8 @@
         
         // دالة إيقاف الماسح الضوئي
         function stopScanner() {
+            if (!scannerActive) return;
+            
             scannerStopped = true;
             scannerActive = false;
             
@@ -434,8 +433,6 @@
             
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            
-            // تحديث حالة الكاميرا
             updateCameraStatus(false, "الكاميرا متوقفة");
         }
         
@@ -448,55 +445,59 @@
                 return;
             }
             
-            // إخفاء الرسائل والنتائج السابقة
             hideError();
             resultDiv.style.display = 'none';
-            
             fetchProductData(barcode);
-            
-            // مسح حقل الإدخال
             barcodeInput.value = '';
         }
         
         // دالة جلب بيانات المنتج من جوجل شيت
         async function fetchProductData(barcode) {
             try {
-                // عرض مؤشر التحميل
                 loading.style.display = 'block';
+                console.log("جاري البحث عن:", barcode);
                 
-                // جلب البيانات من API
                 const response = await fetch(`${API_URL}?barcode=${encodeURIComponent(barcode)}`);
                 
                 if (!response.ok) {
-                    throw new Error("خطأ في الاتصال بالسيرفر");
+                    throw new Error(`خطأ في الاتصال: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log("البيانات المستلمة:", data);
                 
-                // إخفاء مؤشر التحميل
                 loading.style.display = 'none';
                 
-                // التحقق من وجود البيانات
                 if (data.status === "error") {
                     throw new Error(data.message || "المنتج غير موجود");
                 }
                 
-                // عرض البيانات
-                document.getElementById('functional-loc').textContent = data["Functional Loc."] || "-";
-                document.getElementById('covering-area').textContent = data["Covering Area"] || "-";
-                document.getElementById('description').textContent = data["Description"] || "-";
-                document.getElementById('category-desc').textContent = data["Category Description"] || "-";
-                document.getElementById('inspection-date').textContent = data["Last Inspection Date"] || "-";
-                document.getElementById('testing-date').textContent = data["Last Testing Date"] || "-";
-                document.getElementById('operating-area').textContent = data["Operating Area"] || "-";
-                document.getElementById('business-line').textContent = data["Business Line"] || "-";
-                document.getElementById('city').textContent = data["City"] || "-";
-                document.getElementById('ss').textContent = data["S/s"] || "-";
-                document.getElementById('serial-number').textContent = data["Serial Number"] || "-";
-                document.getElementById('object-type').textContent = data["Object Type"] || "-";
-                document.getElementById('location').textContent = data["Location"] || "-";
-                document.getElementById('owning-dept').textContent = data["Owning Dept."] || "-";
-                document.getElementById('business-operating-area').textContent = data["Business+Operating Area"] || "-";
+                // تعبئة البيانات
+                const fields = {
+                    "functional-loc": data["Functional Loc."],
+                    "covering-area": data["Covering Area"],
+                    "description": data["Description"],
+                    "category-desc": data["Category Description"],
+                    "inspection-date": data["Last Inspection Date"],
+                    "testing-date": data["Last Testing Date"],
+                    "operating-area": data["Operating Area"],
+                    "business-line": data["Business Line"],
+                    "city": data["City"],
+                    "ss": data["S/s"],
+                    "serial-number": data["Serial Number"],
+                    "object-type": data["Object Type"],
+                    "location": data["Location"],
+                    "owning-dept": data["Owning Dept."],
+                    "business-operating-area": data["Business+Operating Area"]
+                };
+                
+                Object.entries(fields).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = value || "-";
+                        element.style.color = value ? "" : "#999";
+                    }
+                });
                 
                 resultDiv.style.display = 'block';
                 
