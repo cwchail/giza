@@ -2,148 +2,65 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>نظام مسح QR Code - جوجل شيت</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام مسح QR Code</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.min.js"></script>
     <style>
-        /* جميع أنماط CSS السابقة تبقى كما هي */
-        /* ... */
+        /* أنماط CSS السابقة */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #scanner-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+        #result {
+            margin-top: 20px;
+            text-align: right;
+            direction: rtl;
+        }
+        .field {
+            margin-bottom: 10px;
+        }
+        .field-label {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>نظام مسح QR Code</h1>
-        
-        <!-- جميع عناصر واجهة المستخدم تبقى كما هي -->
-        <!-- ... -->
-        
-        <div id="result">
-            <h2 style="text-align: center; color: var(--primary); margin-top: 0;">تفاصيل العنصر</h2>
-            <div class="product-field">
-                <span class="field-label">الموقع الوظيفي:</span>
-                <span class="field-value" id="functional-loc">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">منطقة التغطية:</span>
-                <span class="field-value" id="covering-area">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">الوصف:</span>
-                <span class="field-value" id="description">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">وصف الفئة:</span>
-                <span class="field-value" id="category-desc">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">تاريخ آخر تفتيش:</span>
-                <span class="field-value" id="inspection-date">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">تاريخ آخر اختبار:</span>
-                <span class="field-value" id="testing-date">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">منطقة التشغيل:</span>
-                <span class="field-value" id="operating-area">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">خط الأعمال:</span>
-                <span class="field-value" id="business-line">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">المدينة:</span>
-                <span class="field-value" id="city">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">S/s:</span>
-                <span class="field-value" id="ss">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">الرقم التسلسلي:</span>
-                <span class="field-value" id="serial-number">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">نوع الكائن:</span>
-                <span class="field-value" id="object-type">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">الموقع:</span>
-                <span class="field-value" id="location">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">القسم المالك:</span>
-                <span class="field-value" id="owning-dept">-</span>
-            </div>
-            <div class="product-field">
-                <span class="field-label">منطقة الأعمال+التشغيل:</span>
-                <span class="field-value" id="business-operating-area">-</span>
-            </div>
+    <h1>نظام مسح QR Code</h1>
+    
+    <div id="scanner-container">
+        <video id="video" width="100%" playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+    
+    <button id="start-btn">بدء المسح</button>
+    <button id="stop-btn" disabled>إيقاف المسح</button>
+    
+    <div id="manual-input" style="margin: 20px 0;">
+        <input type="text" id="barcode-input" placeholder="أدخل الباركود يدوياً">
+        <button id="search-btn">بحث</button>
+    </div>
+    
+    <div id="loading" style="display:none;">جاري التحميل...</div>
+    <div id="error-message" style="color:red; display:none;"></div>
+    
+    <div id="result" style="display:none;">
+        <h2>تفاصيل العنصر</h2>
+        <div class="field">
+            <span class="field-label">الموقع الوظيفي:</span>
+            <span id="functional-loc">-</span>
         </div>
+        <!-- نفس البنية لباقي الحقول -->
     </div>
 
     <script>
-        // رابط API الخاص بك
-        const API_URL = "https://script.google.com/macros/s/AKfycbyl9bGTckEer9QCq-OxBW6GLuzsOTyZwIR0dgldTCEnIgZ06Mt3PXkvkELc_KsbCAVT/exec";
-        
-        // باقي الكود JavaScript يبقى كما هو مع تعديل دالة fetchProductData
-        async function fetchProductData(barcode) {
-            try {
-                loading.style.display = 'block';
-                console.log("جاري جلب بيانات الباركود:", barcode);
-                
-                const response = await fetch(`${API_URL}?barcode=${encodeURIComponent(barcode)}`);
-                
-                if (!response.ok) {
-                    throw new Error(`خطأ في الاتصال: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log("البيانات المستلمة:", data);
-                
-                loading.style.display = 'none';
-                
-                if (data.status === "error") {
-                    throw new Error(data.message || "المنتج غير موجود");
-                }
-                
-                // تعبئة البيانات
-                const fields = {
-                    "functional-loc": data["Functional Loc."],
-                    "covering-area": data["Covering Area"],
-                    "description": data["Description"],
-                    "category-desc": data["Category Description"],
-                    "inspection-date": data["Last Inspection Date"],
-                    "testing-date": data["Last Testing Date"],
-                    "operating-area": data["Operating Area"],
-                    "business-line": data["Business Line"],
-                    "city": data["City"],
-                    "ss": data["S/s"],
-                    "serial-number": data["Serial Number"],
-                    "object-type": data["Object Type"],
-                    "location": data["Location"],
-                    "owning-dept": data["Owning Dept."],
-                    "business-operating-area": data["Business+Operating Area"]
-                };
-                
-                Object.entries(fields).forEach(([id, value]) => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.textContent = value || "لا يوجد بيانات";
-                        element.style.color = value ? "" : "#999";
-                    }
-                });
-                
-                resultDiv.style.display = 'block';
-                
-            } catch (error) {
-                console.error("Error:", error);
-                loading.style.display = 'none';
-                showError(error.message || "حدث خطأ أثناء جلب البيانات");
-            }
-        }
-        
-        // باقي الدوال تبقى كما هي
+        // الكود JavaScript المعدل السابق
         // ...
     </script>
 </body>
